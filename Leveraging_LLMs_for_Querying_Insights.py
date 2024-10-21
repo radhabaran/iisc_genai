@@ -14,6 +14,7 @@ import os
 import openai
 import pickle
 import sqlite3
+import re
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -24,6 +25,8 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain.schema.runnable import RunnablePassthrough
 from langchain_openai import ChatOpenAI
+from langchain_experimental.utilities import PythonREPL
+from langchain_core.tools import Tool
 
 # ************************************************************************************************
 # Understanding the data
@@ -219,3 +222,187 @@ PRAGMA table_info(stock_prices);
 for row in cursor:
     print(row)
 print('*' * 100)
+
+# ************************************************************************************************
+# SQL Query Generation using an LLM
+# ************************************************************************************************
+
+# Read OpenAI key
+f = open('G:\My Drive\AI Datasets\key\openaikey.txt')
+api_key = f.read().strip()          # Remove Blank Spaces
+os.environ['OPENAI_API_KEY'] = api_key
+openai.api_key= os.getenv('OPENAI_API_KEY')
+
+# Load the model
+
+llm = ChatOpenAI(model_name='gpt-4o-mini', temperature=0)
+
+output = llm.invoke("what is 2 plus 3")
+print('test output from LLM : what is 2 plus 3 ? Ans : ', output)
+print('*' * 100)
+
+# Create Chain for Query Generation using LCEL (LangChain Expression Language)
+
+# Build a prompt
+template = """Use the following pieces of context to generate the SQL query / 
+with column names for the request given at the end. / 
+If you don't know the answer, just say that you don't know, don't try to make up an answer.
+{context}
+Request: {request}
+Generate query:"""
+
+PROMPT = PromptTemplate(input_variables=['context', 'request'], template=template)
+
+# Query Generation Chain - created using LCEL (LangChain Expression Language)
+
+chain = (PROMPT | llm | StrOutputParser())
+
+# Context
+table_info = """CREATE TABLE IF NOT EXISTS stock_prices (date DATE, open DOUBLE, high DOUBLE, low DOUBLE, close DOUBLE, volume INT, symbol VARCHAR(20));"""
+
+# Generate SQL Query then query the Database
+
+# Generate sql query
+
+response1 = chain.invoke({"request": "How many total records there in table?",
+                          "context": table_info})
+
+print(response1)
+print('*' * 100)
+
+# Generate another query
+
+response2 = chain.invoke({"request": "What are unique companies symbols present in table?",
+                          "context": table_info})
+
+print(response2)
+print('*' * 100)
+
+# Generate another query
+
+response3 = chain.invoke({"request": "Give me any ten records for Wipro company?",
+                          "context": table_info})
+
+print(response3)
+print('*' * 100)
+
+# Generate another query
+
+response4 = chain.invoke({"request": "Need open, high prices for any ten Wipro records",
+                          "context": table_info})
+
+print(response4)
+print('*' * 100)
+
+# ************************************************************************************************
+# Query the Database using generated SQL queries
+# ************************************************************************************************
+
+def format_query(query):
+    query = re.sub(r"```sql\n|\n```", "", query).strip()
+    query = re.sub(r"\n", "", query).strip()
+    return query
+
+print(format_query(response1))
+
+# Use generated query to get data from database
+
+query = format_query(response1)
+cursor = conn.execute(query)
+
+for row in cursor:
+    print(row)
+print('*' * 100)
+
+# Generated Response2
+print(format_query(response2))
+print('*' * 100)
+
+# Use generated query to get data from database
+
+query = format_query(response2)
+cursor = conn.execute(query)
+
+for row in cursor:
+    print(row)
+print('*' * 100)
+
+# Generated Response3
+print(format_query(response3))
+print('*' * 100)
+# Use generated query to get data from database
+
+query = format_query(response3)
+cursor = conn.execute(query)
+
+for row in cursor:
+    print(row)
+print('*' * 100)
+
+
+# Generated Response4
+print(format_query(response4))
+print('*' * 100)
+
+# Use generated query to get data from database
+
+query = format_query(response4)
+cursor = conn.execute(query)
+
+for row in cursor:
+    print(row)
+print('*' * 100)
+
+# ************************************************************************************************
+# Python Code generation using an LLM
+# ************************************************************************************************
+# The Python REPL is a powerful tool for interactive programming, making it easy to experiment 
+# with Python code and get immediate feedback. # It allows you to enter Python code, evaluate it
+# immediately, and see the results right away.
+#
+# Components of Python REPL:
+#
+# Read: The REPL reads the input you provide. This can be a single line of code, a block of code, 
+# or even multiple commands in succession.
+#
+# Eval: The input is evaluated (executed) by the Python interpreter. This means that the code you 
+# entered is processed, and any calculations or operations are performed.
+
+# Print: The results of the evaluation are printed to the screen. This allows you to see the 
+# output immediately after entering your code.
+
+# Loop: After printing the result, the REPL loops back to read the next input, allowing you to
+# continue interacting with the interpreter.
+#
+# Libraries to be imported
+# from langchain_experimental.utilities import PythonREPL
+# from langchain_core.tools import Tool
+# ************************************************************************************************
+
+python_repl = PythonREPL()
+print(python_repl.run("print(1+1)"))
+print('*' * 100)
+
+# You can create the tool to pass to an agent
+
+repl_tool = Tool(
+    name="python_repl",
+    description="""A Python shell. Use this to execute python commands. Input should be a valid /
+     python command. If you want to see the output of a value, you should print it out with `print(...)`.""",
+    func=python_repl.run,
+)
+
+print(repl_tool.run("print(1+1)"))
+print('*' * 100)
+
+# To plot a sine wave
+
+repl_tool.run("""
+
+x = np.linspace(0, 10, 100)
+y = np.sin(x)
+
+plt.plot(x, y)
+plt.show()
+
+""")
