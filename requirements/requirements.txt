@@ -1,0 +1,12 @@
+numpy
+pandas
+matplotlib
+seaborn
+openai
+langchain-openai
+langchain-core
+langchain-community
+sentence-transformers
+langchain-huggingface
+langchain_experimental
+chainlit
