@@ -255,8 +255,10 @@ PROMPT = PromptTemplate(input_variables=['context', 'request'], template=templat
 
 # Query Generation Chain - created using LCEL (LangChain Expression Language)
 
-chain = (PROMPT | llm | StrOutputParser())
-
+chain = (PROMPT
+         | llm
+         | StrOutputParser()       # to get output in a more usable format
+         )
 # Context
 table_info = """CREATE TABLE IF NOT EXISTS stock_prices (date DATE, open DOUBLE, high DOUBLE, low DOUBLE, close DOUBLE, volume INT, symbol VARCHAR(20));"""
 
@@ -300,7 +302,7 @@ print('*' * 100)
 
 def format_query(query):
     query = re.sub(r"```sql\n|\n```", "", query).strip()
-    query = re.sub(r"\n", "", query).strip()
+    query = re.sub(r"\n", " ", query).strip()
     return query
 
 print(format_query(response1))
@@ -406,3 +408,81 @@ plt.plot(x, y)
 plt.show()
 
 """)
+
+# Generate code using llm
+
+response = llm.invoke('generate and return python code only, no additional text, a code to create sine waves')
+print(response.content)
+print('*' * 100)
+
+# Execute the generated code
+
+repl_tool.run(response.content)
+
+# ************************************************************************************************
+# Create another Chain for Code Generation for Stock Prices
+# ************************************************************************************************
+# Build prompt to use the user_request, generated_sql_query, extracted_data to generate Python 
+# code for insights
+
+template2 = """Use the following pieces of user request and sql query to generate python code /
+ to show insights related to the data given at the end.
+Generate and return python code only, no additional text.
+If you don't know the answer, just say that you don't know, don't try to make up an answer.
+Request: {request}
+Sql query: {sql_query}
+Data: {data}
+Generate code:"""
+
+PROMPT2 = PromptTemplate(input_variables=["request", "sql_query", "data"], template=template2)
+
+# Code Generation Chain
+
+chain2 = (PROMPT2
+          | llm
+          | StrOutputParser()
+          )
+
+# First, Generate SQL Query for a user request
+# Generate sql query
+
+user_request = "Need insights on the trend present in any 50 Wipro records"
+
+generated_query = chain.invoke({"request": user_request,
+                                "context": table_info})
+
+print(generated_query)
+print('*' * 100)
+print(format_query(generated_query))
+print('*' * 100)
+
+# Use generated query to get data from database
+
+query = format_query(generated_query)
+print(query)
+print('*' * 100)
+cursor = conn.execute(query)
+
+extracted_data = []
+
+for row in cursor:
+    extracted_data.append(row)
+
+print(extracted_data[:2])
+print('*' * 100)
+
+# Generate code
+
+response1A = chain2.invoke({"request": user_request,
+                            "sql_query": generated_query,
+                            "data": extracted_data
+                            })
+
+# See the Generated code
+print(response1A)
+print('*' * 100)
+
+# Execute the generated Code for the user request
+# Execute the generated code
+
+print(repl_tool.run(response1A))
