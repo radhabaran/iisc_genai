@@ -14,7 +14,7 @@ from langchain_openai import ChatOpenAI
 
 
 # Read OpenAI key from Codespaces Secrets
-api_key = os.environ['OPENAI_KEY']             # <-- change this as per your Codespaces secret's name
+api_key = os.environ['OA_API']             # <-- change this as per your Codespaces secret's name
 os.environ['OPENAI_API_KEY'] = api_key
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
